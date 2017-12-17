@@ -9,7 +9,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "adm-zip": "^0.4.7",
     "cbr": "^1.0.3",
-    "webp-converter": "^2.1.6"
+    "imagemin": "^5.3.1",
+    "imagemin-webp": "^4.0.0",
+    "yargs": "^10.0.3"
   }
 }
