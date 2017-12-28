@@ -1,11 +1,15 @@
-const fs = require('fs')
-const argv = require('yargs').argv
 const AdmZip = require('adm-zip')
+const archiver = require('archiver');
+const argv = require('yargs').argv
+const fs = require('fs-extra')
 const imagemin = require('imagemin');
 const imageminWebp = require('imagemin-webp');
+const sharp = require('sharp');
 
-
+const tempDirectory = `${__dirname}/temp/`
+const outDir = 'out/'
 const path = argv.path
+const images = []
 
 // scan path for zips
 // unpack zips to __dirname/temp
@@ -15,53 +19,91 @@ const path = argv.path
 // move new zip to path
 
 fs.readdir(path, (err, files) => {
-  files.forEach(file => {
-		// unzip(file);
+	files.forEach(file => {
 		const regex = new RegExp(/(.*)\.cbz/)
 		const zipFile = file.match(regex)
-		if(zipFile) {
-			console.log(unzip(file));
+		if (zipFile) {
+			unzip(file)
 		}
-  });
+	});
+	const tempDirectories = fs.readdirSync(tempDirectory)
+	tempDirectories.forEach(dir => convertJPGStoWEBP(dir))
 })
 
-const unzip = (file) => {
-	const zip = new AdmZip(`${path}/${file}`);
-	const fileNameRegEx = new RegExp(/(.*)\.jpg/)
-	const zipEntries = zip.getEntries(); // an array of ZipEntry records
-	const newZip = new AdmZip();
-	// converToWebp(zipEntries);
-	// const shortName = zipEntries[0].entryName.match(fileNameRegEx)[1]
-
-	zipEntries.forEach(entry => converToWebp(zip.readFile(entry)))
-
-	zipEntries.forEach(entry => {
-		newZip.addFile(
-			`${entry.entryName}.wepb`,
-			converToWebp(zip.readFile(entry))
-		)
+const convertJPGStoWEBP = (dir) => {
+	let tempPath = `${tempDirectory}${dir}`
+	const content = fs.readdirSync(tempPath)
+	if (fs.lstatSync(tempPath + "/" + content[0]).isDirectory()) {
+		tempPath += `/${fs.readdirSync(tempPath)[0]}`
+	}
+	const files = fs.readdirSync(tempPath)
+	imagemin([`${tempPath}/*.jpg`], tempPath, {
+		use: [
+			imageminWebp({
+				quality: 80
+			})
+		]
+	}).then(() => {
+		console.log("done with ", dir)
+		zip(tempPath, dir)
 	})
-
-	// zip.extractAllTo(`${path}/temp`, false)
-	// console.log(zipEntries[0].entryName)
-	// console.log(zipEntries[0].rawEntryName.toString())
-	// console.log(zipEntries[0].extra.toString())
-	// console.log(zipEntries[0].name)
-	// console.log(converToWebp(zipEntries[0].entryName, shortName))
 }
 
-const converToWebp = (entry) => {
-	// console.log('entry', __dirname)
-	imagemin.buffer(entry, {
-		use: [
-			imageminWebp({quality: 80})
-		]
-	}).then((outBuffer) => {
-		console.log('Images optimized');
-		console.log('Outbuffer', outBuffer);
-		return outBuffer
+
+const unzip = (file) => {
+	new AdmZip(`${path}/${file}`).extractAllTo(__dirname + "/temp/" + file)
+}
+
+const zip = (folder, filename) => {
+
+	var output = fs.createWriteStream(outDir + filename + '.zip');
+	var archive = archiver('zip');
+	archive.pipe(output);
+
+	archive.on('warning', function (err) {
+		if (err.code === 'ENOENT') {
+			// log warning
+		} else {
+			// throw error
+			throw err;
+		}
+	});
+
+	archive.on('error', function (err) {
+		throw err;
+	});
+
+	output.on('close', function () {
+		console.log('final size: ', bytesToSize(archive.pointer()));
+		console.log(filename, 'has been converted.');
+		cleanUp(folder, filename)
+	});
+
+	fs.readdirSync(folder)
+		.filter(item => item.includes('webp'))
+		.forEach(file => archive.append(fs.createReadStream(folder + "/" + file), {
+			name: file
+		}))
+
+	archive.finalize(function (err, written) {
+		if (err) {
+			throw err;
+		}
 	});
 }
 
+const cleanUp = (folder, filename) => {
+	fs.remove(folder)
+		.catch(err => {
+			console.error(err)
+		})
+}
 
-
+// thanks to William Oliveira for this nice helper function
+function bytesToSize(bytes) {
+	const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+	if (bytes === 0) return 'n/a'
+	const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)), 10)
+	if (i === 0) return `${bytes} ${sizes[i]})`
+	return `${(bytes / (1024 ** i)).toFixed(1)} ${sizes[i]}`
+}

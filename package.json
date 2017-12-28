@@ -10,9 +10,14 @@
   "license": "ISC",
   "dependencies": {
     "adm-zip": "^0.4.7",
+    "archiver": "^2.1.0",
     "cbr": "^1.0.3",
+    "fs-extra": "^5.0.0",
     "imagemin": "^5.3.1",
     "imagemin-webp": "^4.0.0",
-    "yargs": "^10.0.3"
+    "jszip": "^3.1.5",
+    "sharp": "^0.18.4",
+    "yargs": "^10.0.3",
+    "zip-folder": "^1.0.0"
   }
 }
